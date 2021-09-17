@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Globalization;
 
 namespace MyChallenges.Objects
 {
@@ -10,47 +11,71 @@ namespace MyChallenges.Objects
         double expressionResult;
 
         List<char> operators = new List<char> { '+', '-', '*', '/' };
+        List<char> firstOperators = new List<char> { '*', '/' };
+        List<char> secondOperators = new List<char> { '+', '-' };
 
         public MathExpression(string expression)
         {
-            baseExpression = expression;
+            baseExpression = expression.Replace(".", ",");
             listElements.Add(baseExpression);
-            Console.WriteLine($"Expression start: {baseExpression}");
             this.MenageDivideElements();
         }
 
         public void MenageDivideElements()
         {
+            bool resultReady = false;
             do
             {
                 DivideElements();
             }
             while (!this.AreElementsReady());
 
-            while(listElements.Count > 1)
+            do
             {
-                this.SimpleStep();
+                resultReady = MultipleStep();
             }
-
-            for (int index = 0; index < listElements.Count; index++)
-            {
-                Console.WriteLine($"Elemento {index}: {listElements[index]}");
-            }
+            while (!resultReady);
 
             this.SaveExpressionResult();
-            Console.WriteLine("--------------------------");
         }
 
-        public void SimpleStep()
+        public bool MultipleStep()
         {
-            double firstNumber = double.Parse(this.listElements[0]);
-            double secondNumber = double.Parse(this.listElements[2]);
-            char op = this.listElements[1][0];
+            for (int index = 0; index < listElements.Count - 1; index++)
+            {
+                if (firstOperators.Contains(listElements[index][0]))
+                {
+                    SimpleStep(index);
+                    return false;
+                }
+            }
+
+            for (int index = 0; index < listElements.Count - 1; index++)
+            {
+                if (
+                    (secondOperators.Contains(listElements[index][0]))
+                    &&
+                    !(listElements[index][0] == '-' && listElements[index].Length > 1 && (listElements[index][1] == '(' || char.IsNumber(listElements[index][1])))
+                )
+                {
+                    SimpleStep(index);
+                    return false;
+                }
+            }
+
+            return true;
+        }
+
+        public void SimpleStep(int operatorIndex)
+        {
+            double firstNumber = double.Parse(this.listElements[operatorIndex - 1]);
+            double secondNumber = double.Parse(this.listElements[operatorIndex + 1]);
+            char op = this.listElements[operatorIndex][0];
 
             string resultStep = Helper.Calc(firstNumber, secondNumber, op).ToString();
 
-            listElements.RemoveRange(0, 3);
-            listElements.Insert(0, resultStep);
+            listElements.RemoveRange(operatorIndex - 1, 3);
+            listElements.Insert(operatorIndex - 1, resultStep);
         }
 
         public bool AreElementsReady()
@@ -59,7 +84,7 @@ namespace MyChallenges.Objects
             {
                 foreach (char c in element)
                 {
-                    if (c == ' ')
+                    if (c == ' ' || c == '(' || c == ')')
                         return false;
                 }
             }
@@ -71,18 +96,29 @@ namespace MyChallenges.Objects
         {
             for (int indexElement = 0; indexElement < listElements.Count; indexElement++)
             {
-                if (listElements[indexElement][0] == '(')
-                {
-                    int posParenthesesClose = listElements[indexElement].IndexOf(")", 0);
-                    MathExpression parenthesesExpression = new MathExpression(listElements[indexElement].Substring(1, posParenthesesClose - 1));
-                    listElements[indexElement] = listElements[indexElement].Remove(0, posParenthesesClose + 1).Insert(0, parenthesesExpression.expressionResult.ToString());
-
-                    return;
-                }
-
                 for (int index = 0; index < listElements[indexElement].Length; index++)
                 {
-                    if (operators.Contains(listElements[indexElement][index]) && listElements[indexElement].Length > 1)
+                    if (listElements[indexElement][index] == '(')
+                    {
+                        int posParentheseseOpen = index;
+                        int verifyParenthesesOpen = index;
+                        while ((verifyParenthesesOpen = listElements[indexElement].IndexOf("(", posParentheseseOpen + 1)) > 0)
+                        {
+                            posParentheseseOpen = verifyParenthesesOpen;
+                        }
+
+                        int posParenthesesClose = listElements[indexElement].IndexOf(")", posParentheseseOpen);
+                        MathExpression parenthesesExpression = new MathExpression(listElements[indexElement].Substring(posParentheseseOpen + 1, posParenthesesClose - posParentheseseOpen - 1));
+                        listElements[indexElement] = listElements[indexElement].Remove(posParentheseseOpen, posParenthesesClose - posParentheseseOpen + 1).Insert(posParentheseseOpen, parenthesesExpression.expressionResult.ToString());
+
+                        return;
+                    }
+
+                    if (
+                        (operators.Contains(listElements[indexElement][index]) && listElements[indexElement].Length > 1)
+                        &&
+                        !(listElements[indexElement][index] == '-' && (listElements[indexElement][index+1] == '(' || char.IsNumber(listElements[indexElement][index + 1])))
+                    )
                     {
                         string element = listElements[indexElement];
                         listElements.RemoveAt(indexElement);
